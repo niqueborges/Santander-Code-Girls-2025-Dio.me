@@ -15,4 +15,4 @@ Sou **Monique da Silva Borges**, atualmente em **transição de carreira aos 45 
 [![GitHub](https://img.shields.io/badge/GitHub-black?logo=github&logoColor=white)](https://github.com/niqueborges)  
 
 ---
-✍️ Desenvolvido com dedicação durante o desafio da [DIO](https://www.dio.me/).
+✍️ Desenvolvido com dedicação durante o desafio da [DIO](https://www.dio.me/) com a [Santander Open Academy](https://www.santanderopenacademy.com/).

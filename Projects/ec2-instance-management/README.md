@@ -1,21 +1,21 @@
 # ☁️ Desafio de Projeto - Gerenciando Instâncias EC2 na AWS
 
 ## 📌 Descrição
-Este desafio teve como objetivo consolidar o conhecimento sobre **instâncias EC2** na AWS, explorando também a relação com **EBS** e **S3**.  
+Este desafio teve como objetivo consolidar o conhecimento sobre **instâncias EC2** na AWS, explorando também a relação com **EBS** e **S3**.   
 
 ---
 
-## 🚀 Passos Realizados
-1. Criação da instância **EC2**  
-2. Configuração de **Security Groups** para acesso seguro  
-3. Conexão via **SSH**  
-4. Associação de volume **EBS** à instância  
-5. Integração com **S3** para armazenamento de objetos  
-6. Encerramento e boas práticas de custo  
+## 🛠️ Tecnologias Utilizadas  
+- **AWS EC2** → Criação e gerenciamento de instâncias  
+- **AWS EBS** → Armazenamento em bloco para as instâncias  
+- **AWS S3** → Armazenamento de objetos e arquivos  
+- **Git & GitHub** → Versionamento e compartilhamento do projeto  
+- **Markdown** → Estruturação da documentação  
+- **Draw.io** → Criação de diagramas de arquitetura  
 
 ---
 
-## 📊 Arquitetura do Projeto
+## 📊 Arquitetura do Projeto (Exemplo de diagrama feito no **Draw.io**):
 ![Diagrama EC2, EBS e S3](./images/diagrama-ec2-ebs-s3.png)
 
 ---
@@ -23,8 +23,7 @@ Este desafio teve como objetivo consolidar o conhecimento sobre **instâncias EC
 ## 💡 Insights Pessoais
 - O **EBS** funciona como um HD persistente, independente do estado da instância.  
 - Se não configurar, o EBS pode ser apagado ao terminar a EC2.  
-- O **S3** é excelente para **logs, backups e dados acessíveis globalmente**.  
-- **Security Groups** precisam de atenção: abrir só o necessário!  
+- O **S3** é excelente para **logs, backups e dados acessíveis globalmente**.   
 
 ---
 
