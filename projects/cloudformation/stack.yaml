@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Stack para o Desafio DIO: Step Functions + 2 Lambdas + S3.
+  Cria Lambdas com código inline (simples) e uma State Machine que orquestra Lambda1 -> Lambda2.
+
+Parameters:
+  LambdaRuntime:
+    Type: String
+    Default: python3.11
+    AllowedValues:
+      - python3.9
+      - python3.10
+      - python3.11
+    Description: Runtime para as Lambdas
+
+Resources:
+
+  ## S3 Bucket (outputs)
+  OutputsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "desafio-dio-step-functions-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ## Role para Lambdas (logs + put object no bucket)
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "DesafioDIO-LambdaExecRole-${AWS::AccountId}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: DesafioDIO-LambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource: !Sub "${OutputsBucket.Arn}/*"
+
+  ## Lambda 1 - processa dados (não escreve no S3)
+  Lambda1Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "desafio-dio-lambda1-${AWS::AccountId}"
+      Handler: index.handler
+      Runtime: !Ref LambdaRuntime
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      MemorySize: 128
+      Code:
+        ZipFile: |
+          import json
+          from datetime import datetime
+
+          def handler(event, context):
+              # event pode ser input do Step Function (JSON)
+              payload = event.get('body') if isinstance(event, dict) and 'body' in event else event
+              processed = {
+                  "received": payload,
+                  "processed_at": datetime.utcnow().isoformat() + "Z",
+                  "summary": "Dados processados por Lambda1"
+              }
+              return {"statusCode": 200, "body": processed}
+
+  ## Lambda 2 - grava no S3 (utiliza boto3)
+  Lambda2Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "desafio-dio-lambda2-${AWS::AccountId}"
+      Handler: index.handler
+      Runtime: !Ref LambdaRuntime
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 128
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref OutputsBucket
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import boto3
+          from datetime import datetime
+
+          s3 = boto3.client('s3')
+
+          def handler(event, context):
+              payload = event.get('body') if isinstance(event, dict) and 'body' in event else event
+              ts = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+              filename = f"resultado-{ts}.json"
+              bucket = os.environ.get('BUCKET_NAME')
+
+              body = json.dumps({"stored_at": ts, "payload": payload}, default=str)
+              s3.put_object(Bucket=bucket, Key=filename, Body=body.encode('utf-8'))
+              return {"statusCode": 200, "body": {"s3_key": filename, "bucket": bucket}}
+
+  ## Role para Step Functions (precisa invocar Lambdas)
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "DesafioDIO-StepFuncRole-${AWS::AccountId}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: DesafioDIO-StepFunctionsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt Lambda1Function.Arn
+                  - !GetAtt Lambda2Function.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+
+  ## State Machine (Step Functions)
+  StepStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub "desafio-dio-sm-${AWS::AccountId}"
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Workflow: Lambda1 -> Lambda2 (desafio-dio)",
+          "StartAt": "Lambda1",
+          "States": {
+            "Lambda1": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${Lambda1Arn}",
+                "Payload.$": "$"
+              },
+              "Next": "Lambda2"
+            },
+            "Lambda2": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${Lambda2Arn}",
+                "Payload.$": "$"
+              },
+              "End": true
+            }
+          }
+        }
+      DefinitionSubstitutions:
+        Lambda1Arn: !GetAtt Lambda1Function.Arn
+        Lambda2Arn: !GetAtt Lambda2Function.Arn
+
+Outputs:
+  BucketName:
+    Description: "Nome do bucket S3 criado (onde lambdas gravam outputs)"
+    Value: !Ref OutputsBucket
+
+  Lambda1Arn:
+    Description: "ARN da Lambda1"
+    Value: !GetAtt Lambda1Function.Arn
+
+  Lambda2Arn:
+    Description: "ARN da Lambda2"
+    Value: !GetAtt Lambda2Function.Arn
+
+  StateMachineArn:
+    Description: "ARN da State Machine"
+    Value: !Ref StepStateMachine
