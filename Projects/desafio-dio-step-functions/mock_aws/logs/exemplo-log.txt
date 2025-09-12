@@ -1,1 +1,0 @@
-[2025-09-10 10:00:00] Workflow simulado: Lambda2 processou dados.
