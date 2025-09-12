@@ -1,0 +1,16 @@
+# Ignorar arquivos Python temporários
+__pycache__/
+*.pyc
+outputs/
+mock_aws/outputs/
+
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar credenciais AWS (caso existam)
+*.env
+venv/
+.env/
+.venv/
+.venv
